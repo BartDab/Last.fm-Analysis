@@ -2,40 +2,53 @@ library(tidyverse)
 library(janitor)
 library(data.table)
 library(gganimate)
+#library(gifski)
 
 data<-read.csv("E:/R/iamtomahawk.csv",header=FALSE)
 names(data)<-c('Artist','Album','Title','Date')
 df<-data.frame(data$Artist,data$Date)
 names(df)<-c('Artist','Datetime')
+
 df <- separate(df,Datetime,
                  into=c("Day","Month","Year","Time"),
                  sep=" ")
 df$Month<-match(df$Month,month.abb)
-
-
+#df$Day<-rep(1,nrow(data))
 df<-unite(df,Date,into=c("Year","Month","Day"),sep="-")
+
 #df<-unite(df,Datetime,into=c('Date','Time'),sep=' ')
+
 df$Date<-as.Date(df$Date)
 df2<-df[1:2]
 str(df2)
-help(clean_names)
 
-#df3<-data.frame(unique(df2$Artist),
+#df3<-df2%>%
+#  group_by(Artist)%>%
+#  mutate(Scrobbles_mo=n_distinct(Date))
+
 df3<-df2 %>%
   mutate(Scrobbles=1)
-
+#help(aggregate)
+#df36<-df3%>%
+#  group_by(Artist)%>%
+#  aggregate(df36~Date,sum)%>%
+#  ungroup()
 df35<-df3%>%
-  complete(Artist,Date)
-set.seed(2137)
-df35[is.na(df35)]<-0#runif(1,0,0.0000000000001)
+  complete(Artist,Date) 
 
-df4<-df35 %>%
+set.seed(2137)
+df35[is.na(df35)]<-0
+df37<-df35%>%
+  group_by(Artist,Date)%>%
+  summarize(Scrobbles=sum(Scrobbles))
+#help(funs)
+df4<-df37 %>%
   arrange(Artist,Date)%>%
   group_by(Artist)%>%
-  mutate(Cumsum=cumsum(Scrobbles)+runif(1,0,0.0000000000001),
-         Cumsum_formatted=formatC(Cumsum,0,format="f"))#ave(Scrobbles,c('Artist','Date'),FUN=cumsum))
-#df4<-order(df4,as.vector(df4[,4]),decreasing=TRUE)
-#  mutate(SumScrobbles = cumsum(Scrobbles))
+  #aggregate(df3$Scrobbles_mo, by=list(c(Artist,Date)), sum)
+  mutate(Cumsum=cumsum(Scrobbles)+runif(1,0,0.0000000000001), #prevent from overlappping bars with same height
+         Cumsum_formatted=formatC(Cumsum,0,format="f"))#prevent from displaying values like 31.0000032932093 scrobbles
+
 df5<-df4%>%
   group_by(Date)%>%
   mutate(Rank=rank(-Cumsum))%>%
@@ -75,13 +88,16 @@ df5<-df4%>%
         plot.margin = margin(2,2, 2, 4, "cm"))
   
   
-  animated = staticplot + transition_states(Date, transition_length = 4, state_length = 1) +
+  animated = staticplot + transition_states(Date, transition_length = 4, state_length = 2) +
     view_follow(fixed_x = TRUE)  +
     labs(title = 'My top artists on last.fm: {closest_state}',  
          subtitle  =  "Top 10",
          caption  = "Scrobbling since 9th March 2018")
+
+#  animate(animated, 1400, fps = 20,  width = 1200, height = 1000, 
+  #        renderer = gifski_renderer("gganim.gif"))
   
-  animate(animated, 1400, fps = 20,  width = 1200, height = 1000, 
-          renderer = ffmpeg_renderer()) -> for_mp4
-  anim_save("top_artists.mp4", animation = for_mp4 )
+  video<-animate(animated, 1400, fps = 25,  width = 1200, height = 1000, 
+          renderer = ffmpeg_renderer())
+  anim_save("top_artists.mp4", animation = video)
   
